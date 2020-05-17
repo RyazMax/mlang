@@ -1,10 +1,19 @@
 package evaluator
 
+/*
+	Модуль осуществляющий выполнение абстрактного синтаксического дерева программы.
+	Основные функции EvalProgram и Eval осуществляют исполнение программы или другого узла аст
+*/
+
 import (
 	"fmt"
 	"mlang/ast"
 	"mlang/object"
 )
+
+const MAX_RECURSION_LEVEL = 90000
+
+var lvl int
 
 var (
 	NULL  = &object.Null{}
@@ -12,27 +21,44 @@ var (
 	FALSE = &object.Boolean{Value: false}
 )
 
+func EvalProgram(stmts []ast.Statement, env *object.Environment) []object.Object {
+	var (
+		results []object.Object
+		result  object.Object
+	)
+
+	for _, stmt := range stmts {
+		result = Eval(stmt, env)
+
+		switch result := result.(type) {
+		case *object.ReturnValue:
+			results = append(results, result.Value)
+			return results
+		case *object.Error:
+			results = append(results, result)
+			return results
+		}
+		results = append(results, result)
+	}
+
+	return results
+}
+
 func Eval(node ast.Node, env *object.Environment) object.Object {
+	lvl += 1
+	defer func() { lvl -= 1 }()
+	if lvl > MAX_RECURSION_LEVEL {
+		return newError("max recursion level reached")
+	}
 	switch node := node.(type) {
-	case *ast.Program:
-		return evalProgram(node.Statements, env)
-	case *ast.LetStatement:
-		val := Eval(node.Value, env)
-		if isError(val) {
-			return val
-		}
-		env.Set(node.Name.Value, val)
-	case *ast.AssignExpression:
-		val := Eval(node.Value, env)
-		if isError(val) {
-			return val
-		}
-		env.Set(node.Name.Value, val)
-		return val
+	case *ast.AssignStatement:
+		return evalAssignStatement(node, env)
 	case *ast.ExpressionStatement:
 		return Eval(node.Expression, env)
 	case *ast.Identifier:
 		return evalIdentifier(node, env)
+	case *ast.Null:
+		return NULL
 	case *ast.FunctionLiteral:
 		params := node.Parameters
 		body := node.Body
@@ -94,7 +120,21 @@ func isError(obj object.Object) bool {
 }
 
 func isTruthy(obj object.Object) bool {
-	return !(obj == NULL || obj == FALSE)
+	switch obj := obj.(type) {
+	case *object.Integer:
+		return obj.Value != 0
+	default:
+		return !(obj == NULL || obj == FALSE)
+	}
+}
+
+func evalAssignStatement(as *ast.AssignStatement, env *object.Environment) object.Object {
+	val := Eval(as.Value, env)
+	if isError(val) {
+		return val
+	}
+	env.Set(as.Name.Value, val)
+	return val
 }
 
 func evalIdentifier(id *ast.Identifier, env *object.Environment) object.Object {
@@ -139,25 +179,9 @@ func evalIfExpression(ie *ast.IfExpression, env *object.Environment) object.Obje
 	}
 }
 
-func evalProgram(stmts []ast.Statement, env *object.Environment) object.Object {
-	var result object.Object
-
-	for _, stmt := range stmts {
-		result = Eval(stmt, env)
-
-		switch result := result.(type) {
-		case *object.ReturnValue:
-			return result.Value
-		case *object.Error:
-			return result
-		}
-	}
-
-	return result
-}
-
 func evalBlockStatements(stmts []ast.Statement, env *object.Environment) object.Object {
 	var result object.Object
+	result = NULL
 
 	for _, stmt := range stmts {
 		result = Eval(stmt, env)
@@ -189,27 +213,25 @@ func evalMinusPrefixOperatorExpression(right object.Object) object.Object {
 	case object.INTEGER_OBJ:
 		value := right.(*object.Integer).Value
 		return &object.Integer{Value: -value}
-	case object.BOOLEAN_OBJ:
-		value := int64(0)
-		if right.(*object.Boolean).Value {
-			value = 1
-		}
-		return &object.Integer{Value: -value}
 	default:
-		return NULL
+		return newError("unknown operator: -%s", right.Type())
 	}
 }
 
 func evalBangOperatorExpression(right object.Object) object.Object {
-	switch right {
-	case TRUE:
-		return FALSE
-	case FALSE:
-		return TRUE
-	case NULL:
-		return TRUE
+	return nativeBoolToBooleanObject(!isTruthy(right))
+}
+
+func isLogicOperator(operator string) bool {
+	switch operator {
+	case "||":
+		fallthrough
+	case "&&":
+		fallthrough
+	case "^":
+		return true
 	default:
-		return FALSE
+		return false
 	}
 }
 
@@ -219,9 +241,28 @@ func evalInfixExpression(operator string, left object.Object, right object.Objec
 		return evalIntegerInfixExpression(operator, left, right)
 	case left.Type() == object.BOOLEAN_OBJ && right.Type() == object.BOOLEAN_OBJ:
 		return evalBooleanInfixExpression(operator, left, right)
-
+	case left.Type() == object.NULL_OBJ && right.Type() == object.NULL_OBJ:
+		return evalNullInfixExpression(operator, left, right)
+	case operator == "==":
+		return nativeBoolToBooleanObject(left == right)
+	case operator == "!=":
+		return nativeBoolToBooleanObject(left != right)
+	case isLogicOperator(operator):
+		l, r := nativeBoolToBooleanObject(isTruthy(left)), nativeBoolToBooleanObject(isTruthy(right))
+		return evalBooleanInfixExpression(operator, l, r)
 	case left.Type() != right.Type():
 		return newError("type mismatch: %s %s %s", left.Type(), operator, right.Type())
+	default:
+		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
+	}
+}
+
+func evalNullInfixExpression(operator string, left object.Object, right object.Object) object.Object {
+	switch operator {
+	case "==":
+		return nativeBoolToBooleanObject(left == right)
+	case "!=":
+		return nativeBoolToBooleanObject(left != right)
 	default:
 		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
 	}
@@ -251,6 +292,13 @@ func evalIntegerInfixExpression(operator string, left object.Object, right objec
 		return nativeBoolToBooleanObject(leftVal > rightVal)
 	case "!=":
 		return nativeBoolToBooleanObject(leftVal != rightVal)
+	case "||":
+		return nativeBoolToBooleanObject(isTruthy(left) || isTruthy(right))
+	case "&&":
+		return nativeBoolToBooleanObject(isTruthy(left) && isTruthy(right))
+	case "^":
+		leftBool, rightBool := isTruthy(left), isTruthy(right)
+		return nativeBoolToBooleanObject(leftBool != rightBool)
 	default:
 		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
 	}
@@ -262,32 +310,16 @@ func evalBooleanInfixExpression(operator string, left object.Object, right objec
 		return nativeBoolToBooleanObject(left == right)
 	case "!=":
 		return nativeBoolToBooleanObject(left != right)
-	}
-
-	var leftInt, rightInt int64
-	if left.(*object.Boolean).Value {
-		leftInt = 1
-	}
-	if right.(*object.Boolean).Value {
-		rightInt = 1
-	}
-
-	switch operator {
-	case "+":
-		return &object.Integer{Value: leftInt + rightInt}
-	case "*":
-		return &object.Integer{Value: leftInt * rightInt}
-	case "-":
-		return &object.Integer{Value: leftInt - rightInt}
-	case "/":
-		if rightInt == 0 {
-			return newError("division by zero %s %s %s", left.Inspect(), operator, right.Inspect())
-		}
-		return &object.Integer{Value: leftInt / rightInt}
+	case "&&":
+		return nativeBoolToBooleanObject(left == TRUE && right == TRUE)
+	case "||":
+		return nativeBoolToBooleanObject(left == TRUE || right == TRUE)
+	case "^":
+		return nativeBoolToBooleanObject(left != right)
 	case "<":
-		return nativeBoolToBooleanObject(leftInt < rightInt)
+		return nativeBoolToBooleanObject(left == FALSE && right == TRUE)
 	case ">":
-		return nativeBoolToBooleanObject(leftInt > rightInt)
+		return nativeBoolToBooleanObject(left == TRUE && right == FALSE)
 	default:
 		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
 	}
@@ -303,6 +335,10 @@ func nativeBoolToBooleanObject(input bool) *object.Boolean {
 func applyFunction(fn object.Object, args []object.Object) object.Object {
 	switch fn := fn.(type) {
 	case *object.Function:
+		if len(fn.Parameters) != len(args) {
+			return newError("function expects %d arguments, %d was given",
+				len(fn.Parameters), len(args))
+		}
 		extendedEnv := extendFunctionEnv(fn, args)
 		evaluated := Eval(fn.Body, extendedEnv)
 		return unwrapReturnValue(evaluated)

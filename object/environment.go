@@ -3,6 +3,7 @@ package object
 type Environment struct {
 	store map[string]Object
 	outer *Environment
+	lvl   int
 }
 
 func NewEnvironment() *Environment {

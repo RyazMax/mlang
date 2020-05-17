@@ -14,14 +14,14 @@ type Token struct {
 }
 
 var keywords = map[string]TokenType{
-	"fn":     FUNCTION,
-	"let":    LET,
+	"func":   FUNCTION,
 	"return": RETURN,
 	"if":     IF,
 	"else":   ELSE,
 	"fork":   FORK,
 	"true":   TRUE,
 	"false":  FALSE,
+	"null":   NULL,
 }
 
 func LookupIdent(ident string) TokenType {
@@ -40,20 +40,19 @@ const (
 	INT   = "INT"
 
 	// Operators
-	ASSIGN       = "="
-	PLUS_ASSIGN  = "+="
-	MINUS_ASSIGN = "-="
-	MUL_ASSIGN   = "*="
-	DIV_ASSIGN   = "/="
-	PLUS         = "+"
-	MINUS        = "-"
-	MUL          = "*"
-	DIV          = "/"
-	LT           = "<"
-	GT           = ">"
-	BANG         = "!"
-	EQUAL        = "=="
-	NOT_EQUAL    = "!="
+	ASSIGN           = "="
+	PLUS             = "+"
+	MINUS            = "-"
+	MUL              = "*"
+	DIV              = "/"
+	LT               = "<"
+	GT               = ">"
+	BANG             = "!"
+	EQUAL            = "=="
+	NOT_EQUAL        = "!="
+	DOUBLE_AMPERSAND = "&&"
+	DOUBLE_PIPE      = "||"
+	CARET            = "^"
 
 	// Delimeters
 	COMMA     = ","
@@ -66,11 +65,11 @@ const (
 
 	// Keywords
 	FUNCTION = "FUNCTION"
-	LET      = "LET"
 	FORK     = "FORK"
 	IF       = "IF"
 	ELSE     = "ELSE"
 	RETURN   = "RETURN"
 	TRUE     = "TRUE"
 	FALSE    = "FALSE"
+	NULL     = "NULL"
 )

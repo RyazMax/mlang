@@ -12,20 +12,28 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Hello %s! This is the MLang programming language!\n", user.Username)
-	fmt.Printf("Feel free to type in commands\n")
 
 	in := os.Stdin
 	out := os.Stdout
-	if len(os.Args) > 2 {
+	interactive := true
+	if len(os.Args) > 1 {
 		in, err = os.Open(os.Args[1])
 		if err != nil {
 			fmt.Printf("Can not open file %s", os.Args[1])
+			return
 		}
-		out, err = os.Create(os.Args[2])
-		if err != nil {
-			fmt.Printf("Can not open file %s", os.Args[1])
+		if len(os.Args) > 2 {
+			out, err = os.Create(os.Args[2])
+			if err != nil {
+				fmt.Printf("Can not open file %s", os.Args[1])
+				return
+			}
 		}
+		interactive = false
 	}
-	repl.Start(in, out)
+	if interactive {
+		fmt.Printf("Hello %s! This is the MLang programming language!\n", user.Username)
+		fmt.Printf("Feel free to type in commands\n")
+	}
+	repl.Start(in, out, interactive)
 }

@@ -1,0 +1,10 @@
+fact = func(x, acc) {
+    if (x < 2) {
+        return acc
+    } else {
+        return fact(x - 1, acc * x)
+    }
+}
+
+n = read()
+print(fact(n, 1))

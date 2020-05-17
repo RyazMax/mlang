@@ -1,10 +1,8 @@
 package lexer
 
-/* TODO:
-1. We need to support utf8 chars
-2. Refactor lexer:
-	1. Make it use some kind of regular expression
-	2. Change checking of operators
+/*
+	Осуществляет разбор входного текста на токены
+	Лексер структура с методом NextToken() возвращающий следующий токен из входного текста
 */
 
 import (
@@ -17,10 +15,11 @@ type Lexer struct {
 	position     int
 	readPosition int
 	ch           byte
+	lastToken    token.Token
 }
 
 func New(input string) *Lexer {
-	l := &Lexer{input: input}
+	l := &Lexer{input: input, lastToken: newToken(token.SEMICOLON, 0)}
 	l.readChar()
 	return l
 }
@@ -48,6 +47,8 @@ func (l *Lexer) NextToken() token.Token {
 	l.skipWhitespace()
 
 	switch l.ch {
+	case '\n':
+		tok = newToken(token.SEMICOLON, ';')
 	case '=':
 		if l.peekChar() == '=' {
 			ch := l.ch
@@ -57,37 +58,13 @@ func (l *Lexer) NextToken() token.Token {
 			tok = newToken(token.ASSIGN, l.ch)
 		}
 	case '+':
-		if l.peekChar() == '=' {
-			ch := l.ch
-			l.readChar()
-			tok = token.Token{Type: token.PLUS_ASSIGN, Literal: string(ch) + string(l.ch)}
-		} else {
-			tok = newToken(token.PLUS, l.ch)
-		}
+		tok = newToken(token.PLUS, l.ch)
 	case '-':
-		if l.peekChar() == '=' {
-			ch := l.ch
-			l.readChar()
-			tok = token.Token{Type: token.MINUS_ASSIGN, Literal: string(ch) + string(l.ch)}
-		} else {
-			tok = newToken(token.MINUS, l.ch)
-		}
+		tok = newToken(token.MINUS, l.ch)
 	case '/':
-		if l.peekChar() == '=' {
-			ch := l.ch
-			l.readChar()
-			tok = token.Token{Type: token.DIV_ASSIGN, Literal: string(ch) + string(l.ch)}
-		} else {
-			tok = newToken(token.DIV, l.ch)
-		}
+		tok = newToken(token.DIV, l.ch)
 	case '*':
-		if l.peekChar() == '=' {
-			ch := l.ch
-			l.readChar()
-			tok = token.Token{Type: token.MUL_ASSIGN, Literal: string(ch) + string(l.ch)}
-		} else {
-			tok = newToken(token.MUL, l.ch)
-		}
+		tok = newToken(token.MUL, l.ch)
 	case '(':
 		tok = newToken(token.LPAREN, l.ch)
 	case ')':
@@ -112,28 +89,54 @@ func (l *Lexer) NextToken() token.Token {
 		} else {
 			tok = newToken(token.BANG, l.ch)
 		}
+	case '&':
+		if l.peekChar() == '&' {
+			ch := l.ch
+			l.readChar()
+			tok = token.Token{Type: token.DOUBLE_AMPERSAND, Literal: string(ch) + string(l.ch)}
+		} else {
+			tok = newToken(token.ILLEGAL, l.ch)
+		}
+	case '|':
+		if l.peekChar() == '|' {
+			ch := l.ch
+			l.readChar()
+			tok = token.Token{Type: token.DOUBLE_PIPE, Literal: string(ch) + string(l.ch)}
+		} else {
+			tok = newToken(token.ILLEGAL, l.ch)
+		}
+	case '^':
+		tok = newToken(token.CARET, l.ch)
 	case 0:
-		tok.Literal = ""
+		tok.Literal = "EOF"
 		tok.Type = token.EOF
 	default:
 		if isLetter(l.ch) {
 			tok.Literal = l.readIdentifier()
 			tok.Type = token.LookupIdent(tok.Literal)
+			l.lastToken = tok
 			return tok
 		} else if isDigit(l.ch) {
-			tok.Literal = l.readNumber()
-			tok.Type = token.INT
+			var ok bool
+			tok.Literal, ok = l.readNumber()
+			if ok {
+				tok.Type = token.INT
+			} else {
+				tok.Type = token.ILLEGAL
+			}
+			l.lastToken = tok
 			return tok
 		}
 		tok = newToken(token.ILLEGAL, l.ch)
 	}
 
 	l.readChar()
+	l.lastToken = tok
 	return tok
 }
 
 func (l *Lexer) skipWhitespace() {
-	for unicode.IsSpace(rune(l.ch)) {
+	for unicode.IsSpace(rune(l.ch)) && (l.ch != '\n' || l.lastToken.Type == token.SEMICOLON || l.lastToken.Type == token.LBRACE) {
 		l.readChar()
 	}
 }
@@ -142,17 +145,24 @@ func isDigit(ch byte) bool {
 	return unicode.IsDigit(rune(ch))
 }
 
-func (l *Lexer) readNumber() string {
+func (l *Lexer) readNumber() (string, bool) {
 	position := l.position
 	for isDigit(l.ch) {
 		l.readChar()
 	}
-	return l.input[position:l.position]
+
+	ok := true
+	for isLetter(l.ch) {
+		l.readChar()
+		ok = false
+	}
+
+	return l.input[position:l.position], ok
 }
 
 func (l *Lexer) readIdentifier() string {
 	position := l.position
-	for isLetter(l.ch) {
+	for isLetter(l.ch) || isDigit(l.ch) {
 		l.readChar()
 	}
 	return l.input[position:l.position]

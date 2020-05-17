@@ -52,15 +52,15 @@ func (id *Identifier) String() string {
 	return id.Value
 }
 
-type LetStatement struct {
+type AssignStatement struct {
 	Token token.Token
 	Name  *Identifier
 	Value Expression
 }
 
-func (ls *LetStatement) statementNode()       {}
-func (ls *LetStatement) TokenLiteral() string { return ls.Token.Literal }
-func (ls *LetStatement) String() string {
+func (ls *AssignStatement) statementNode()       {}
+func (ls *AssignStatement) TokenLiteral() string { return ls.Token.Literal }
+func (ls *AssignStatement) String() string {
 	var out bytes.Buffer
 
 	out.WriteString(ls.TokenLiteral() + " ")
@@ -259,25 +259,10 @@ func (ce *CallExpression) String() string {
 	return out.String()
 }
 
-type AssignExpression struct {
+type Null struct {
 	Token token.Token
-	Name  *Identifier
-	Value Expression
 }
 
-func (ae *AssignExpression) expressionNode()      {}
-func (ae *AssignExpression) TokenLiteral() string { return ae.Token.Literal }
-func (ae *AssignExpression) String() string {
-	var out bytes.Buffer
-
-	out.WriteString(ae.TokenLiteral() + " ")
-	out.WriteString(ae.Name.String())
-	out.WriteString(" = ")
-
-	if ae.Value != nil {
-		out.WriteString(ae.Value.String())
-	}
-	out.WriteString(";")
-
-	return out.String()
-}
+func (n *Null) expressionNode()      {}
+func (n *Null) TokenLiteral() string { return n.Token.Literal }
+func (n *Null) String() string       { return n.Token.Literal }

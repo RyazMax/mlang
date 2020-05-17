@@ -7,7 +7,7 @@ import (
 )
 
 func TestNextTokenSimple(t *testing.T) {
-	input := `=+(){},-/*<>! == !=;`
+	input := `=+(){},-/*<>! == !=&&||^;`
 
 	expected := []struct {
 		expectedType    token.TokenType
@@ -28,8 +28,11 @@ func TestNextTokenSimple(t *testing.T) {
 		{token.BANG, "!"},
 		{token.EQUAL, "=="},
 		{token.NOT_EQUAL, "!="},
+		{token.DOUBLE_AMPERSAND, "&&"},
+		{token.DOUBLE_PIPE, "||"},
+		{token.CARET, "^"},
 		{token.SEMICOLON, ";"},
-		{token.EOF, ""},
+		{token.EOF, "EOF"},
 	}
 
 	l := New(input)
@@ -50,25 +53,20 @@ func TestNextTokenSimple(t *testing.T) {
 }
 
 func TestNextToken(t *testing.T) {
-	input := `let five = 5;
-	let ten = 10;
+	input := `five = 5
+	ten = 10
+	5ten
 	
-	let add = fn(x, y) {
-		x + y;
-	};
+	add5 = func(x, y) {
+		x + y
+	}
 	
-	let result = add(five, ten);
+	result = add(five, ten)
 
 	if (5 < 10) {
-		return true;
+		return true
 	} else {
-		return false;
-	}
-
-	fork {
-
-	}, {
-
+		return false
 	}
 	`
 
@@ -76,20 +74,19 @@ func TestNextToken(t *testing.T) {
 		expectedType    token.TokenType
 		expectedLiteral string
 	}{
-		{token.LET, "let"},
 		{token.IDENT, "five"},
 		{token.ASSIGN, "="},
 		{token.INT, "5"},
 		{token.SEMICOLON, ";"},
-		{token.LET, "let"},
 		{token.IDENT, "ten"},
 		{token.ASSIGN, "="},
 		{token.INT, "10"},
 		{token.SEMICOLON, ";"},
-		{token.LET, "let"},
-		{token.IDENT, "add"},
+		{token.ILLEGAL, "5ten"},
+		{token.SEMICOLON, ";"},
+		{token.IDENT, "add5"},
 		{token.ASSIGN, "="},
-		{token.FUNCTION, "fn"},
+		{token.FUNCTION, "func"},
 		{token.LPAREN, "("},
 		{token.IDENT, "x"},
 		{token.COMMA, ","},
@@ -102,7 +99,6 @@ func TestNextToken(t *testing.T) {
 		{token.SEMICOLON, ";"},
 		{token.RBRACE, "}"},
 		{token.SEMICOLON, ";"},
-		{token.LET, "let"},
 		{token.IDENT, "result"},
 		{token.ASSIGN, "="},
 		{token.IDENT, "add"},
@@ -129,13 +125,8 @@ func TestNextToken(t *testing.T) {
 		{token.FALSE, "false"},
 		{token.SEMICOLON, ";"},
 		{token.RBRACE, "}"},
-		{token.FORK, "fork"},
-		{token.LBRACE, "{"},
-		{token.RBRACE, "}"},
-		{token.COMMA, ","},
-		{token.LBRACE, "{"},
-		{token.RBRACE, "}"},
-		{token.EOF, ""},
+		{token.SEMICOLON, ";"},
+		{token.EOF, "EOF"},
 	}
 
 	l := New(input)
@@ -144,8 +135,50 @@ func TestNextToken(t *testing.T) {
 		tok := l.NextToken()
 
 		if tok.Type != tt.expectedType {
-			t.Fatalf("tests[%d] - tokentype wrong. expected=%q, got %q",
-				i, tt.expectedType, tok.Type)
+			t.Fatalf("tests[%d] - tokentype wrong. expected=%q, got %q %q",
+				i, tt.expectedType, tok.Type, tok.Literal)
+		}
+
+		if tok.Literal != tt.expectedLiteral {
+			t.Fatalf("tests[%d] - literal wrong. expected=%q, got=%q",
+				i, tt.expectedLiteral, tok.Literal)
+		}
+	}
+}
+
+func TestNextTokenMultiline(t *testing.T) {
+	input := `
+	x = 5
+	y = 10
+	foobar = 8282828
+	`
+
+	expected := []struct {
+		expectedType    token.TokenType
+		expectedLiteral string
+	}{
+		{token.IDENT, "x"},
+		{token.ASSIGN, "="},
+		{token.INT, "5"},
+		{token.SEMICOLON, ";"},
+		{token.IDENT, "y"},
+		{token.ASSIGN, "="},
+		{token.INT, "10"},
+		{token.SEMICOLON, ";"},
+		{token.IDENT, "foobar"},
+		{token.ASSIGN, "="},
+		{token.INT, "8282828"},
+		{token.SEMICOLON, ";"},
+	}
+
+	l := New(input)
+
+	for i, tt := range expected {
+		tok := l.NextToken()
+
+		if tok.Type != tt.expectedType {
+			t.Fatalf("tests[%d] - tokentype wrong. expected=%q, got %q %q",
+				i, tt.expectedType, tok.Type, tok.Literal)
 		}
 
 		if tok.Literal != tt.expectedLiteral {

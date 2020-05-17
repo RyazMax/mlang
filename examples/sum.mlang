@@ -1,0 +1,10 @@
+f = func(acc) {
+    a = read()
+    if (a) {
+        f(acc + a)
+    } else {
+        acc
+    }
+}
+
+print(f(0))
