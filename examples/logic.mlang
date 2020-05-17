@@ -1,0 +1,6 @@
+a = read()
+if (a > 100 || a < 50  && a / 2 == (a + 1) / 2) {
+    print(1)
+} else {
+    print(2)
+}
