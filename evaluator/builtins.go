@@ -3,6 +3,7 @@ package evaluator
 import (
 	"fmt"
 	"mlang/object"
+	"time"
 )
 
 var builtins = map[string]*object.Builtin{
@@ -18,6 +19,13 @@ var builtins = map[string]*object.Builtin{
 	"bool": &object.Builtin{
 		Fn: toBool,
 	},
+	"time": &object.Builtin{
+		Fn: timeFunc,
+	},
+}
+
+func timeFunc(args ...object.Object) object.Object {
+	return &object.Integer{Value: time.Now().UnixNano()}
 }
 
 func printFunc(args ...object.Object) object.Object {
