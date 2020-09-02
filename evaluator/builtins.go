@@ -7,19 +7,19 @@ import (
 )
 
 var builtins = map[string]*object.Builtin{
-	"sum": &object.Builtin{
+	"sum": {
 		Fn: sumFunc,
 	},
-	"print": &object.Builtin{
+	"print": {
 		Fn: printFunc,
 	},
-	"read": &object.Builtin{
+	"read": {
 		Fn: readFunc,
 	},
-	"bool": &object.Builtin{
+	"bool": {
 		Fn: toBool,
 	},
-	"time": &object.Builtin{
+	"time": {
 		Fn: timeFunc,
 	},
 }
