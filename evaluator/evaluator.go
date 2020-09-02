@@ -22,6 +22,7 @@ var (
 )
 
 func EvalProgram(stmts []ast.Statement, env *object.Environment) []object.Object {
+	builtins["forn"] = &object.Builtin{Fn: fornFunc}
 	var (
 		results []object.Object
 		result  object.Object
