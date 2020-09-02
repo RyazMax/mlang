@@ -7,21 +7,43 @@ import (
 )
 
 var builtins = map[string]*object.Builtin{
-	"sum": &object.Builtin{
+	"sum": {
 		Fn: sumFunc,
 	},
-	"print": &object.Builtin{
+	"print": {
 		Fn: printFunc,
 	},
-	"read": &object.Builtin{
+	"read": {
 		Fn: readFunc,
 	},
-	"bool": &object.Builtin{
+	"bool": {
 		Fn: toBool,
 	},
-	"time": &object.Builtin{
+	"time": {
 		Fn: timeFunc,
 	},
+}
+
+func fornFunc(args ...object.Object) object.Object {
+	if len(args) < 2 {
+		return newError("not enouth arguments")
+	}
+	switch obj := args[0].(type) {
+	case *object.Integer:
+	default:
+		return newError("forn expects integer as first argument. got=%s", obj.Type())
+	}
+	switch obj := args[1].(type) {
+	case *object.Function:
+	default:
+		return newError("forn expects function as second argument. got=%s", obj.Type())
+	}
+	for i := int64(0); i < args[0].(*object.Integer).Value; i++ {
+		fun := args[1].(*object.Function)
+		fun.Env.Set("i", &object.Integer{Value: i})
+		applyFunction(fun, args[2:])
+	}
+	return NULL
 }
 
 func timeFunc(args ...object.Object) object.Object {
